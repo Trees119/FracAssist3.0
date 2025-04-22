@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>压裂指挥辅助工具</title>
+    <!-- 引入外部样式 -->
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <!-- 主容器，分为左侧动画区域、分割条和右侧数据区域 -->
+    <div class="container">
+      <!-- 左侧容器：显示动画和图例 -->
+      <div class="left-panel">
+        <h2 class="left-panel-title">井筒流体</h2>
+        <div class="legend-container">
+          <div class="legend-item">
+            <div class="legend-square yellow"></div>
+            <span class="legend-text">筒內</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-square red"></div>
+            <span class="legend-text">地层</span>
+          </div>
+        </div>
+        <!-- 动画区域 -->
+        <div id="wellboreAnimation"></div>
+      </div>
+      <!-- 分割条：用于拖拽改变左右容器的宽度，同时点击可切换左侧容器显示/隐藏 -->
+      <div class="divider"></div>
+      <!-- 右侧容器：显示表头、数据输入、表格和操作按钮 -->
+      <div class="right-panel">
+        <div class="header">
+          <h1>
+            <span contenteditable="true" id="wellName">____ 井____段压裂施工</span>
+          </h1>
+          <!-- 新增旋转按钮，位置在右上角，不影响原有布局 -->
+ 				  <button id="toggleLayoutBtn" class="rotate-btn">排列</button>
+        </div>
+        <div class="volume-inputs">
+          <div class="volume-item">
+            <label for="groundVolume">管汇：</label>
+            <input type="number" id="groundVolume" placeholder="请输入" oninput="updateTotalVolume()">
+          </div>
+          <div class="volume-item">
+            <label for="wellboreVolume">井筒：</label>
+            <input type="text" id="wellboreVolume" placeholder="点击输入" readonly oninput="updateTotalVolume()">
+            <!-- 旁边按钮用于弹出计算对话框 -->
+            <button type="button" id="openDialogBtn" onclick="openWellboreDialog()">计算</button>
+          </div>
+          <div class="volume-item">
+            <label for="totalVolume">总容积：</label>
+            <input type="number" id="totalVolume" placeholder="自动计算" readonly>
+          </div>
+        </div>
+        <div class="table-container">
+          <table id="dataTable">
+            <thead>
+              <tr>
+                <th>料</th>
+                <th>砂量</th>
+                <th>砂比</th>
+                <th>当前液量</th>
+                <th>到达液量</th>
+                <th>阶段液量</th>
+                <th>压力</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+               <!-- 新增：按住录入功能区 开始 -->
+        <div class="voice-input-container">
+         <button id="micButton">按住录入</button>
+         <span id="status">就绪</span>
+         <span id="confidence"></span>
+         <div id="resultDisplay"></div>
+        </div>
+        <div class="buttons">
+          <button id="addRowBtn">添加</button>
+          <button id="deleteRowBtn">删除</button>
+          <button id="undoBtn">撤销</button>
+          <button id="exportBtn">导出</button>
+          <button id="resetBtn">重置</button>
+        </div>
+        
+     <!-- 新增：按住录入功能区 结束 -->
+
+      </div>
+    </div>
+
+    <!-- 模态对话框：用于输入井筒数据 -->
+    <div id="wellboreDialog" class="modal">
+      <div class="modal-content">
+        <h3>输入井筒数据</h3>
+        <label for="sectionDepth">段深：</label>
+        <input type="number" id="sectionDepth" placeholder="请输入段深">
+        <label for="diameter">直径：</label>
+        <input type="number" id="diameter" placeholder="请输入直径">
+        <label for="wallThickness">壁厚：</label>
+        <input type="number" id="wallThickness" placeholder="请输入壁厚">
+        <div class="modal-buttons">
+          <button id="calcWellboreBtn">计算</button>
+          <button id="closeDialogBtn" onclick="closeWellboreDialog()">关闭</button>
+        </div>
+      </div>
+    </div>
+    <!-- 引入外部脚本 -->
+    <script src="script.js"></script>
+  </body>
+</html>

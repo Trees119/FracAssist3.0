@@ -1,0 +1,362 @@
+/* ---------------- 基本页面样式 ---------------- */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  margin: 0;
+  padding: 0;
+}
+
+/* 主容器采用 Flex 布局，左右两个区域加上中间分割条 */
+.container {
+  display: flex;
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh; /* 占满整个视窗 */
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.container.rotated {
+  position: absolute;             /* 使容器脱离文档流 */
+  top: 0;
+  left: 0;
+  width: 100vh;                   /* 旋转后宽度设置为原视口高度 */
+  height: 100vw;                  /* 旋转后高度设置为原视口宽度 */
+  transform: rotate(90deg) translate(0, -100%);  
+  transform-origin: top left;     /* 以左上角为旋转基点 */
+}
+/* 新增：当容器使用 vertical-layout 类时，采用上下排列 */
+.container.vertical-layout {
+  flex-direction: column;
+}
+.container.vertical-layout .left-panel,
+.container.vertical-layout .right-panel {
+  width: 100%;
+  overflow: auto;
+}
+/* 当容器为垂直排列时，调整分割条的样式 */
+.container.vertical-layout .divider {
+  width: 100%;
+  height: 5px;
+  cursor: row-resize; /* 鼠标样式调整为行拖拽 */
+  background-color: #E0E0E0;
+  position: relative;
+  border: 1px solid #BDBDBD;
+}
+
+.container.vertical-layout .divider::before {
+  content: "";
+  position: absolute;
+  left: 50%;       /* 横向居中 */
+  top: 0;
+  width: 1cm;      /* 中心区域宽度 */
+  height: 100%;    /* 高度占满分割条 */
+  background-color: #BDBDBD;
+  transform: translateX(-50%);
+}
+
+
+
+/* ---------------- 左侧容器样式 ---------------- */
+.left-panel {
+  width: 300px;          /* 初始宽度为300px */
+  min-width: 0px;       /* 最小宽度限制 */
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  background-color: #fff;
+  overflow: auto;
+}
+
+/* ---------------- 右侧容器样式 ---------------- */
+.right-panel {
+  flex: 1;
+  height: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: #fff;
+  overflow: auto;
+}
+
+/* ---------------- 分割条样式 ---------------- */
+.divider {
+  width: 5px;
+  cursor: col-resize;      /* 鼠标样式显示可以拖拽 */
+  background-color: #E0E0E0;
+  position: relative;
+  border: 1px solid #BDBDBD;
+}
+.divider:hover {
+  background-color: #E0E0E0;
+}
+/* 分割条中间较深区域，用伪元素实现，点击该区域可切换左侧容器显示/隐藏 */
+.divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1cm;
+  background-color: #BDBDBD;
+  transform: translateY(-50%);
+}
+
+/* ---------------- 左侧动画区域内部样式 ---------------- */
+.left-panel-title {
+  text-align: center;
+  font-size: 1.2rem;
+  margin: 0;
+  color: #333;
+}
+.legend-container {
+  margin: 0.5cm 0;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5cm;
+  align-items: center;
+  justify-content: center;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+}
+.legend-square {
+  width: 0.5cm;
+  height: 0.5cm;
+  background-color: yellow;
+  border: 2px solid black;
+  margin-right: 0.1cm;
+}
+.legend-square.red {
+  background-color: red;
+}
+.legend-text {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #333;
+  white-space: nowrap;
+}
+/* 动画区域 */
+#wellboreAnimation {
+  width: 3cm;
+  height: 10cm; /* 预留标题和图例区域的高度 */
+  background-color: gray;
+  border: 2px solid black;
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+}
+.wellbore-segment {
+  width: 100%;
+  position: relative;
+  border: 1px solid black;
+  box-sizing: border-box;
+}
+.segment-annotation {
+  font-family: "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: bold;   
+  color: black;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%); 
+  white-space: nowrap;
+}
+/* 如果动画段为红色，则对应注解文字变为白色 */
+.wellbore-segment.red-segment .segment-annotation {
+  color: white;
+}
+
+/* ---------------- 右侧区域相关样式 ---------------- */
+.header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+/* 新增：冻结表头功能 */
+.table-container thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f2f2f2;
+  z-index: 2;
+}
+
+/* 新增：按住录入功能样式 */
+.voice-input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+#micButton {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #2196F3;
+  color: #fff;
+  cursor: pointer;
+}
+#micButton:active {
+  background-color: #1565C0;
+}
+#status,
+#confidence {
+  font-size: 0.9rem;
+}
+#resultDisplay {
+  flex: 1;
+  padding: 5px;
+  min-height: 1.5em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  overflow-wrap: break-word;
+}
+.volume-inputs {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+.volume-item {
+  display: flex;
+  align-items: center;
+  margin: 5px;
+}
+.volume-item label {
+  font-weight: bold;
+  margin-right: 5px;
+  font-size: 0.9rem;
+}
+.volume-item input {
+  width: 60px;
+  padding: 3px 5px;
+  font-size: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.table-container {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  table-layout: fixed;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+  word-wrap: break-word;
+  font-size: 0.9rem;
+  width: calc(100% / 7);
+}
+thead th {
+  background-color: #f2f2f2;
+}
+td[contenteditable="true"]:empty:before {
+  content: attr(placeholder);
+  color: #ccc;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+.buttons button {
+  flex: 1 1 auto;
+  min-width: 60px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  background-color: #28a745;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.buttons button:hover {
+  background-color: #218838;
+}
+.selected {
+  background-color: #d0eaff !important;
+}
+.rotate-btn {
+  position: absolute;      /* 绝对定位于 header 内 */
+  top: 5px;                /* 离上边5px，可根据需要微调 */
+  right: 5px;              /* 离右边5px */
+  padding: 2px 6px;        /* 内边距较小 */
+  font-size: 0.8rem;       /* 字号较小 */
+  cursor: pointer;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+
+.rotate-btn:hover {
+  background-color: #218838;
+}
+
+/* ---------------- 模态对话框样式 ---------------- */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.4);
+}
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-content h3 {
+  margin: 0;
+  text-align: center;
+}
+.modal-content label {
+  font-size: 0.9rem;
+}
+.modal-content input {
+  padding: 5px;
+  font-size: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.modal-buttons {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+}
+.modal-content button {
+  padding: 8px;
+  font-size: 0.9rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.modal-content button:hover {
+  background-color: #218838;
+}
+
+/* ---------------- 小屏幕适配 ---------------- */
