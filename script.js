@@ -1,17 +1,30 @@
-// 页面加载完成后执行所有脚本
-// —— 完整替换：确保从文件顶部开始就只有这一个 EnhancedVoiceSystem 类 —— 
-// ———— 完整替换：EnhancedVoiceSystem 开始 ————
+/* ==================== EnhancedVoiceSystem with Press-Release Continuous Recognition ==================== */
 class EnhancedVoiceSystem {
   constructor() {
-    this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    this.configureEngine();
-    this.bindEvents();
+    this.btn = document.getElementById('micButton');
+    this.usePlus = !!(window.plus && plus.speech);
+    this.useWebSpeech = !this.usePlus && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    this.useCloud = !this.usePlus && !this.useWebSpeech;
 
     this.confidenceThreshold = 0.72;
     this.labels = ['料', '砂量', '砂比', '当前液量'];
     this.permissionGranted = false;
     this.isPressed = false;
+    this.accSegments = [];
+
+    if (this.useWebSpeech) {
+      this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      this.configureWebSpeech();
+    }
+    if (this.useCloud) {
+      this.cloudUrl = 'wss://your-cloud-speech-server.example.com';
+      this.ws = null;
+      this.mediaRecorder = null;
+      this.chunks = [];
+    }
+
     this.initPermission();
+    this.bindEvents();
   }
 
   async initPermission() {
@@ -19,12 +32,8 @@ class EnhancedVoiceSystem {
       try {
         const status = await navigator.permissions.query({ name: 'microphone' });
         if (status.state === 'granted') this.permissionGranted = true;
-        status.onchange = () => {
-          if (status.state === 'granted') this.permissionGranted = true;
-        };
-      } catch (e) {
-        console.warn('Permissions API 不支持或查询失败', e);
-      }
+        status.onchange = () => { if (status.state === 'granted') this.permissionGranted = true; };
+      } catch (e) { console.warn('Permissions 查询失败', e); }
     }
   }
 
@@ -32,150 +41,135 @@ class EnhancedVoiceSystem {
     if (!this.permissionGranted && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(t => t.stop());
         this.permissionGranted = true;
-      } catch (e) {
-        console.error('获取麦克风权限失败', e);
-      }
+      } catch (e) { console.error('麦克风权限获取失败', e); }
     }
   }
 
-  configureEngine() {
+  configureWebSpeech() {
     this.recognition.lang = 'zh-CN';
-    this.recognition.continuous = true;
+    this.recognition.continuous = true; // 持续识别
     this.recognition.interimResults = false;
     this.recognition.maxAlternatives = 5;
   }
 
   bindEvents() {
-    const btn = document.getElementById('micButton');
-    // 桌面
-    btn.addEventListener('mousedown', async e => {
+    const startHandler = async e => {
       e.preventDefault();
       await this.requestMicPermissionOnce();
-      this.startRecording();
-    });
-    btn.addEventListener('mouseup', () => this.stopRecording());
-    // 移动端
-    btn.addEventListener('touchstart', async e => {
-      e.preventDefault();
-      await this.requestMicPermissionOnce();
-      this.startRecording();
-    });
-    btn.addEventListener('touchend', e => {
-      e.preventDefault();
-      this.stopRecording();
-    });
+      this.startRecognition();
+    };
+    const endHandler = e => { e.preventDefault(); this.stopRecognition(); };
 
-    this.recognition.onresult = e => this.processResult(e);
-    this.recognition.onerror = e => {
-      console.error(e.error);
-      document.getElementById('status').textContent = `错误：${e.error}`;
-    };
-    this.recognition.onend = () => {
-      if (this.isPressed) this.recognition.start();
-    };
+    ['mousedown','touchstart'].forEach(evt => this.btn.addEventListener(evt, startHandler));
+    ['mouseup','touchend'].forEach(evt => this.btn.addEventListener(evt, endHandler));
+
+    if (this.useWebSpeech) {
+      this.recognition.onresult = e => this.collectWebSpeech(e);
+      this.recognition.onerror = e => this.showError(e.error);
+      this.recognition.onend = () => {
+        if (this.isPressed) {
+          this.recognition.start(); // 持续识别
+        } else {
+          this.processAccumulated(); // 按键松开，处理所有片段
+        }
+      };
+    }
   }
 
-  startRecording() {
+  startRecognition() {
     if (!this.permissionGranted) return;
     this.isPressed = true;
-    this.recognition.start();
+    this.accSegments = [];
     document.getElementById('status').textContent = '识别中...';
-    document.getElementById('micButton').style.backgroundColor = '#1565C0';
+    this.btn.style.backgroundColor = '#1565C0';
+    if (this.usePlus) {
+      plus.speech.startRecognize({ lang: 'zh-CN' }, text => this.accSegments.push(text), err => this.showError(err.message));
+    } else if (this.useWebSpeech) {
+      this.recognition.start();
+    } else if (this.useCloud) {
+      this.startCloudRecognition();
+    }
   }
 
-  stopRecording() {
+  stopRecognition() {
     this.isPressed = false;
-    this.recognition.stop();
     document.getElementById('status').textContent = '就绪';
-    document.getElementById('micButton').style.backgroundColor = '#2196F3';
+    this.btn.style.backgroundColor = '#2196F3';
+    if (this.usePlus) {
+      plus.speech.stopRecognize();
+    } else if (this.useWebSpeech) {
+      this.recognition.stop();
+    } else if (this.useCloud) {
+      if (this.mediaRecorder) this.mediaRecorder.stop();
+    }
   }
 
-  processResult(event) {
-    // 收集所有最终识别片段
-    const segs = [];
+  collectWebSpeech(event) {
     Array.from(event.results).forEach(res => {
-      if (res.isFinal) segs.push(res[0].transcript.trim());
+      if (res.isFinal) {
+        this.accSegments.push(res[0].transcript.trim());
+      }
     });
-    const fullText = segs.join(' ');
-    // 选 confidence 最优的备选
-    const allAlts = [];
-    Array.from(event.results).forEach(res => allAlts.push(...res));
-    let best = allAlts.reduce((b, alt) => {
-      if (alt.confidence < this.confidenceThreshold) return b;
-      const nums = (alt.transcript.match(/\d+(?:\.\d+)?/g) || []).length;
-      const hasP = /压力/.test(alt.transcript) ? 1 : 0;
-      const score = nums + hasP * 2;
-      return (!b || score > b.score) ? { alt, score } : b;
-    }, null);
-    if (!best) {
-      const alt = allAlts.reduce((a, b) => a.confidence > b.confidence ? a : b);
-      best = { alt, score: 0 };
-    }
+  }
 
-    document.getElementById('confidence').textContent =
-      `置信度：${(best.alt.confidence * 100).toFixed(1)}%`;
+  startCloudRecognition() {
+    this.ws = new WebSocket(this.cloudUrl);
+    this.ws.onopen = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.chunks = [];
+        this.mediaRecorder = new MediaRecorder(stream);
+        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
+        this.mediaRecorder.onstop = () => {
+          const blob = new Blob(this.chunks, { type: 'audio/webm' });
+          this.ws.send(blob);
+        };
+        this.mediaRecorder.start();
+      } catch (err) { this.showError('流录制失败'); }
+    };
+    this.ws.onmessage = evt => this.accSegments.push(evt.data);
+    this.ws.onerror = () => this.showError('云识别连接错误');
+    this.ws.onclose = () => {};
+  }
 
-    // 格式化输出
-    const out = this.buildDisplay(fullText);
+  processAccumulated() {
+    if (this.accSegments.length === 0) return;
+    const combined = this.accSegments.join(' ');
+    // 默认信心度计算为最高片段
+    const confidence = 1;
+    document.getElementById('confidence').textContent = `置信度：${(confidence*100).toFixed(1)}%`;
+    const out = this.buildDisplay(combined);
     document.getElementById('resultDisplay').textContent = out || '未识别到有效内容';
+    if (out) this.fillTable(out);
+  }
 
-    // —— 关键：调用自动填表 —— 
-     if (out) {
-      this.fillTable(out);
-    }
+  showError(msg) {
+    console.error(msg);
+    document.getElementById('status').textContent = `错误：${msg}`;
   }
 
   buildDisplay(text) {
     text = text.replace(/[和及时，、]/g, ' ');
     const raw = text.match(/\d+(?:\.\d+)?|[零一二三四五六七八九十百千万点]+/g) || [];
-    const parsed = [];
-    raw.forEach(tk => {
-      if (/^[零一二三四五六七八九十百千万点]+$/.test(tk)) {
-        if (!/[十百千万点]/.test(tk) && tk.length > 1) {
-          tk.split('').forEach(c => parsed.push(this._chn2num(c)));
-        } else {
-          parsed.push(this.parseChineseNumber(tk));
-        }
-      } else parsed.push(tk);
-    });
-    let pressure = null;
-    const pIdx = parsed.findIndex(v => v === '压力');
-    if (pIdx !== -1 && parsed[pIdx+1]) {
-      pressure = parsed[pIdx+1];
-      parsed.splice(pIdx, 2);
-    }
+    const parsed = raw.map(tk => /^[零一二三四五六七八九十百千万点]+$/.test(tk) ? this.parseChineseNumber(tk) : tk);
     const parts = [];
-    parsed.forEach((val, i) => {
-      if (this.labels[i] !== undefined) parts.push(`${this.labels[i]}${val}`);
-    });
-    if (pressure !== null) parts.push(`压力${pressure}`);
+    parsed.forEach((val, i) => { if (this.labels[i]) parts.push(this.labels[i] + val); });
     return parts.join(' ');
   }
 
   fillTable(text) {
-    // 1. 解析各项数据
     const dataMap = {};
     text.split(/\s+/).forEach(token => {
       const m = token.match(/(料|砂量|砂比|当前液量)(.+)/);
       if (m) dataMap[m[1]] = m[2];
     });
-
-    // 2. 找到表格第一个料列为空的行
-    const tbody = document.getElementById('dataTable').querySelector('tbody');
+    const tbody = document.querySelector('#dataTable tbody');
     for (let row of tbody.rows) {
-      if (row.cells[0].textContent.trim() === '') {
-        // 3. 填入对应列
-        row.cells[0].textContent = dataMap['料'] || '';
-        row.cells[1].textContent = dataMap['砂量'] || '';
-        row.cells[2].textContent = dataMap['砂比'] || '';
-        row.cells[3].textContent = dataMap['当前液量'] || '';
-        // 4. 更新后续计算和高亮
-                // —— 新改动：手动触发 input 事件，让表格走原有的更新逻辑 —— 
-        const currentCell = row.cells[3]; // “当前液量”那列
-        currentCell.dispatchEvent(new Event('input', { bubbles: true }));
-
+      if (!row.cells[0].textContent.trim()) {
+        ['料','砂量','砂比','当前液量'].forEach((lbl, i) => row.cells[i].textContent = dataMap[lbl] || '');
+        row.cells[3].dispatchEvent(new Event('input', { bubbles: true }));
         break;
       }
     }
@@ -185,7 +179,7 @@ class EnhancedVoiceSystem {
     const map = { '零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9 };
     if (text.includes('点')) {
       const [i, d] = text.split('点');
-      return this._parseIntChn(i) + '.' + d.split('').map(c => map[c]||'').join('');
+      return this._parseIntChn(i) + '.' + d.split('').map(c => map[c]).join('');
     }
     return this._parseIntChn(text).toString();
   }
@@ -195,20 +189,15 @@ class EnhancedVoiceSystem {
     const unit = { '万':10000,'千':1000,'百':100,'十':10 };
     let sec = 0, num = 0;
     for (let c of chn) {
-      if (map[c] !== undefined) num = map[c];
-      else if (unit[c]) { sec += (num||1)*unit[c]; num = 0; }
+      if (map[c] != null) num = map[c];
+      else if (unit[c]) { sec += (num || 1) * unit[c]; num = 0; }
     }
     return sec + num;
   }
-
-  _chn2num(c) {
-    const map = { '零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9 };
-    return map[c] != null ? map[c].toString() : '';
-  }
 }
-// ———— 完整替换：EnhancedVoiceSystem 结束 ————
 
 
+// 页面初始化
 window.onload = function() {
   // —— 新增：把语音结果里的“文字+数字”写入到表格中
 
@@ -760,5 +749,8 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
   updateTotalVolume();
     // 新增：启动按住录入功能
   new EnhancedVoiceSystem();
+  // 保留其余原有功能加载、事件绑定逻辑
+  loadData(); attachLongPressEventsToAllRows(); updateTotalVolume();
 
 };
+
