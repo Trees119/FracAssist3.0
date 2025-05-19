@@ -196,7 +196,7 @@ class EnhancedVoiceSystem {
   }
 }
 
-
+let currentFocusedRow = null; // 新增：追踪当前聚焦行
 // 页面初始化
 window.onload = function() {
   // —— 新增：把语音结果里的“文字+数字”写入到表格中
@@ -667,7 +667,7 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
       updateAllRows();
     }
   });
-
+  // ---------------- 添加操作函数 ----------------
   document.getElementById('addRowBtn').addEventListener('click', function() {
     pushUndoState();
     const tableBody = document.getElementById('dataTable').querySelector('tbody');
@@ -680,17 +680,24 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
     attachLongPressEvent(newRow);
     updateAllRows();
   });
-
+  // ---------------- 删除操作函数 ----------------
   document.getElementById('deleteRowBtn').addEventListener('click', function() {
-    if (selectedRow) {
-      pushUndoState();
-      selectedRow.parentNode.removeChild(selectedRow);
-      selectedRow = null;
-      updateAllRows();
-    } else {
-      alert("请长按选中一行以删除。");
-    }
-  });
+  if (currentFocusedRow) {
+    pushUndoState();
+    currentFocusedRow.remove();
+    currentFocusedRow = null;
+    updateAllRows();
+  } else {
+    alert("请先点击要删除的行中的单元格");
+  }
+});
+  // 新增：当单元格获得焦点时记录所在行
+document.getElementById('dataTable').addEventListener('focusin', function(e) {
+  const cell = e.target;
+  if (cell.tagName === 'TD') {
+    currentFocusedRow = cell.parentElement;
+  }
+});
 
   document.getElementById('undoBtn').addEventListener('click', function() {
     restoreUndoState();
@@ -714,43 +721,13 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
     }
   }
 
-  // ---------------- 长按选中行功能 ----------------
-  function attachLongPressEventsToAllRows() {
-    const tableBody = document.getElementById('dataTable').querySelector('tbody');
-    Array.from(tableBody.rows).forEach(row => {
-      attachLongPressEvent(row);
-    });
-  }
 
-  function attachLongPressEvent(row) {
-    row.addEventListener('touchstart', startLongPress);
-    row.addEventListener('touchend', cancelLongPress);
-    row.addEventListener('mousedown', startLongPress);
-    row.addEventListener('mouseup', cancelLongPress);
-  }
-
-  function startLongPress(e) {
-    const row = e.currentTarget;
-    longPressTimer = setTimeout(function() {
-      const tableBody = document.getElementById('dataTable').querySelector('tbody');
-      Array.from(tableBody.rows).forEach(r => r.classList.remove('selected'));
-      row.classList.add('selected');
-      selectedRow = row;
-    }, 800);
-  }
-
-  function cancelLongPress(e) {
-    clearTimeout(longPressTimer);
-  }
 
   // 初始化数据、事件绑定及计算更新
   loadData();
-  attachLongPressEventsToAllRows();
   updateTotalVolume();
     // 新增：启动按住录入功能
   new EnhancedVoiceSystem();
-  // 保留其余原有功能加载、事件绑定逻辑
-  loadData(); attachLongPressEventsToAllRows(); updateTotalVolume();
 
 };
 
