@@ -173,11 +173,25 @@ body {
   margin-bottom: 10px;
 }
 /* 新增：冻结表头功能 */
-.table-container thead th {
+.table-container {
+  max-height: calc(100vh - 200px); /* 动态计算容器高度 */
+  overflow-y: auto;               /* 启用垂直滚动 */
+  position: relative;             /* 创建定位上下文 */
+  margin-top: 10px;               /* 与上方元素保持间距 */
+}
+
+/* 修改原有表头样式 */
+table thead tr {
   position: sticky;
   top: 0;
-  background-color: #f2f2f2;
-  z-index: 2;
+  z-index: 3;                     /* 高于表格内容层级 */
+}
+
+table th {
+  position: sticky;
+  top: 0;
+  background: #f2f2f2 !important; /* 覆盖可能存在的其他背景色 */
+  box-shadow: 0 2px 3px -1px rgba(0, 0, 0, 0.1); /* 添加下阴影增强立体感 */
 }
 
 /* 新增：按住录入功能样式 */
@@ -358,5 +372,16 @@ td[contenteditable="true"]:empty:before {
 .modal-content button:hover {
   background-color: #218838;
 }
-
-/* ---------------- 小屏幕适配 ---------------- */
+/* 新增点击效果 */
+tr {
+  transition: all 0.15s ease;
+  cursor: pointer;
+   touch-action: manipulation;
+}
+tr.selected {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  background-color: #e3f2fd !important;
+}
+tr:active {
+  background-color: #bbdefb !important;
+}
