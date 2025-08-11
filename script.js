@@ -1,162 +1,113 @@
+let systemTimeTimer = null;
+
+function updateSystemTime() {
+  const now = new Date();
+  document.getElementById('systemTime').value =
+    now.toLocaleDateString() + ' ' +
+    now.toLocaleTimeString('zh-CN', { hour12: false });
+}
+// ======= 总液量动态更新定时器 =======
+let totalLiquidTimer = null;
+// 每秒更新一次总液量并写入表格当前液量
+function updateDynamicTotalLiquid() {
+  // 1. 取排量（单位 L/min）和现有总液量（L）
+  const disp = parseFloat(document.getElementById('displacement').value) || 0;
+  const totalInput = document.getElementById('totalLiquid');
+  let total = parseFloat(totalInput.value) || 0;
+
+  // 2. 增量=排量/60 （L/sec）
+  total += disp / 60;
+  total = parseFloat(total.toFixed(3));      // 保留三位小数，提高精度
+  totalInput.value = total;                   // 更新输入框
+
+  // 3. 找到第一行：料、砂量、砂比 都 为空
+  const rows = document.querySelectorAll('#dataTable tbody tr');
+  for (let row of rows) {
+    const c0 = row.cells[0].textContent.trim();
+    const c1 = row.cells[1].textContent.trim();
+    const c2 = row.cells[2].textContent.trim();
+    if (c0 === '' && c1 === '' && c2 === '') {
+      // 把计算好的总液量写入“当前液量”列（第4列，索引3）
+      row.cells[3].textContent = total.toFixed(1);
+      // 触发 input 事件，保证后续逻辑（updateAllRows）执行
+      row.cells[3].dispatchEvent(new Event('input', { bubbles: true }));
+      break;
+    }
+  }
+}
+
+
+// ======= 系统时间更新控制结束 =======
 /* ==================== EnhancedVoiceSystem with Press-Release Continuous Recognition ==================== */
+// ✅ 离线语音识别系统（替换原来的 EnhancedVoiceSystem）
+import { recognizeOffline } from './offlineVoice.js';
+
 class EnhancedVoiceSystem {
   constructor() {
     this.btn = document.getElementById('micButton');
-    this.usePlus = !!(window.plus && plus.speech);
-    this.useWebSpeech = !this.usePlus && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    this.useCloud = !this.usePlus && !this.useWebSpeech;
+    this.mediaRecorder = null;
+    this.audioChunks = [];
+    this.isRecording = false;
 
-    this.confidenceThreshold = 0.72;
-    this.labels = ['料', '砂量', '砂比', '当前液量'];
-    this.permissionGranted = false;
-    this.isPressed = false;
-    this.accSegments = [];
-
-    if (this.useWebSpeech) {
-      this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      this.configureWebSpeech();
-    }
-    if (this.useCloud) {
-      this.cloudUrl = 'wss://your-cloud-speech-server.example.com';
-      this.ws = null;
-      this.mediaRecorder = null;
-      this.chunks = [];
-    }
-
-    this.initPermission();
     this.bindEvents();
   }
 
-  async initPermission() {
-    if (navigator.permissions && navigator.permissions.query) {
-      try {
-        const status = await navigator.permissions.query({ name: 'microphone' });
-        if (status.state === 'granted') this.permissionGranted = true;
-        status.onchange = () => { if (status.state === 'granted') this.permissionGranted = true; };
-      } catch (e) { console.warn('Permissions 查询失败', e); }
-    }
-  }
-
-  async requestMicPermissionOnce() {
-    if (!this.permissionGranted && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop());
-        this.permissionGranted = true;
-      } catch (e) { console.error('麦克风权限获取失败', e); }
-    }
-  }
-
-  configureWebSpeech() {
-    this.recognition.lang = 'zh-CN';
-    this.recognition.continuous = true; // 持续识别
-    this.recognition.interimResults = false;
-    this.recognition.maxAlternatives = 5;
-  }
-
   bindEvents() {
-    const startHandler = async e => {
+    this.btn.addEventListener('mousedown', () => this.startRecording());
+    this.btn.addEventListener('mouseup', () => this.stopRecording());
+    this.btn.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      await this.requestMicPermissionOnce();
-      this.startRecognition();
-    };
-    const endHandler = e => { e.preventDefault(); this.stopRecognition(); };
-
-    ['mousedown','touchstart'].forEach(evt => this.btn.addEventListener(evt, startHandler));
-    ['mouseup','touchend'].forEach(evt => this.btn.addEventListener(evt, endHandler));
-
-    if (this.useWebSpeech) {
-      this.recognition.onresult = e => this.collectWebSpeech(e);
-      this.recognition.onerror = e => this.showError(e.error);
-      this.recognition.onend = () => {
-        if (this.isPressed) {
-          this.recognition.start(); // 持续识别
-        } else {
-          this.processAccumulated(); // 按键松开，处理所有片段
-        }
-      };
-    }
-  }
-
-  startRecognition() {
-    if (!this.permissionGranted) return;
-    this.isPressed = true;
-    this.accSegments = [];
-    document.getElementById('status').textContent = '识别中...';
-    this.btn.style.backgroundColor = '#1565C0';
-    if (this.usePlus) {
-      plus.speech.startRecognize({ lang: 'zh-CN' }, text => this.accSegments.push(text), err => this.showError(err.message));
-    } else if (this.useWebSpeech) {
-      this.recognition.start();
-    } else if (this.useCloud) {
-      this.startCloudRecognition();
-    }
-  }
-
-  stopRecognition() {
-    this.isPressed = false;
-    document.getElementById('status').textContent = '就绪';
-    this.btn.style.backgroundColor = '#2196F3';
-    if (this.usePlus) {
-      plus.speech.stopRecognize();
-    } else if (this.useWebSpeech) {
-      this.recognition.stop();
-    } else if (this.useCloud) {
-      if (this.mediaRecorder) this.mediaRecorder.stop();
-    }
-  }
-
-  collectWebSpeech(event) {
-    Array.from(event.results).forEach(res => {
-      if (res.isFinal) {
-        this.accSegments.push(res[0].transcript.trim());
-      }
+      this.startRecording();
+    });
+    this.btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      this.stopRecording();
     });
   }
 
-  startCloudRecognition() {
-    this.ws = new WebSocket(this.cloudUrl);
-    this.ws.onopen = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this.chunks = [];
-        this.mediaRecorder = new MediaRecorder(stream);
-        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
-        this.mediaRecorder.onstop = () => {
-          const blob = new Blob(this.chunks, { type: 'audio/webm' });
-          this.ws.send(blob);
-        };
-        this.mediaRecorder.start();
-      } catch (err) { this.showError('流录制失败'); }
-    };
-    this.ws.onmessage = evt => this.accSegments.push(evt.data);
-    this.ws.onerror = () => this.showError('云识别连接错误');
-    this.ws.onclose = () => {};
+  async startRecording() {
+    if (this.isRecording) return;
+    this.isRecording = true;
+
+    document.getElementById('status').textContent = '正在录音...';
+    this.btn.style.backgroundColor = '#1565C0';
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.audioChunks = [];
+
+      this.mediaRecorder.ondataavailable = (e) => {
+        this.audioChunks.push(e.data);
+      };
+
+      this.mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+        const text = await recognizeOffline(audioBlob);
+        this.handleResult(text);
+      };
+
+      this.mediaRecorder.start();
+    } catch (err) {
+      console.error('麦克风权限失败', err);
+      document.getElementById('status').textContent = '麦克风权限失败';
+      this.btn.style.backgroundColor = '#2196F3';
+      this.isRecording = false;
+    }
   }
 
-  processAccumulated() {
-    if (this.accSegments.length === 0) return;
-    const combined = this.accSegments.join(' ');
-    // 默认信心度计算为最高片段
-    const confidence = 1;
-    document.getElementById('confidence').textContent = `置信度：${(confidence*100).toFixed(1)}%`;
-    const out = this.buildDisplay(combined);
-    document.getElementById('resultDisplay').textContent = out || '未识别到有效内容';
-    if (out) this.fillTable(out);
+  stopRecording() {
+    if (!this.isRecording) return;
+    this.isRecording = false;
+    document.getElementById('status').textContent = '识别中...';
+    this.btn.style.backgroundColor = '#2196F3';
+    this.mediaRecorder.stop();
   }
 
-  showError(msg) {
-    console.error(msg);
-    document.getElementById('status').textContent = `错误：${msg}`;
-  }
-
-  buildDisplay(text) {
-    text = text.replace(/[和及时，、]/g, ' ');
-    const raw = text.match(/\d+(?:\.\d+)?|[零一二三四五六七八九十百千万点]+/g) || [];
-    const parsed = raw.map(tk => /^[零一二三四五六七八九十百千万点]+$/.test(tk) ? this.parseChineseNumber(tk) : tk);
-    const parts = [];
-    parsed.forEach((val, i) => { if (this.labels[i]) parts.push(this.labels[i] + val); });
-    return parts.join(' ');
+  handleResult(text) {
+    document.getElementById('status').textContent = '就绪';
+    document.getElementById('resultDisplay').textContent = text;
+    if (text) this.fillTable(text);
   }
 
   fillTable(text) {
@@ -165,34 +116,17 @@ class EnhancedVoiceSystem {
       const m = token.match(/(料|砂量|砂比|当前液量)(.+)/);
       if (m) dataMap[m[1]] = m[2];
     });
+
     const tbody = document.querySelector('#dataTable tbody');
     for (let row of tbody.rows) {
       if (!row.cells[0].textContent.trim()) {
-        ['料','砂量','砂比','当前液量'].forEach((lbl, i) => row.cells[i].textContent = dataMap[lbl] || '');
+        ['料', '砂量', '砂比', '当前液量'].forEach((lbl, i) => {
+          row.cells[i].textContent = dataMap[lbl] || '';
+        });
         row.cells[3].dispatchEvent(new Event('input', { bubbles: true }));
         break;
       }
     }
-  }
-
-  parseChineseNumber(text) {
-    const map = { '零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9 };
-    if (text.includes('点')) {
-      const [i, d] = text.split('点');
-      return this._parseIntChn(i) + '.' + d.split('').map(c => map[c]).join('');
-    }
-    return this._parseIntChn(text).toString();
-  }
-
-  _parseIntChn(chn) {
-    const map = { '零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9 };
-    const unit = { '万':10000,'千':1000,'百':100,'十':10 };
-    let sec = 0, num = 0;
-    for (let c of chn) {
-      if (map[c] != null) num = map[c];
-      else if (unit[c]) { sec += (num || 1) * unit[c]; num = 0; }
-    }
-    return sec + num;
   }
 }
 
@@ -655,6 +589,8 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
       document.getElementById('groundVolume').value = "";
       document.getElementById('wellboreVolume').value = "";
       document.getElementById('totalVolume').value = "";
+      document.getElementById('displacement').value = "";
+      document.getElementById('totalLiquid').value = "";
       document.getElementById('dataTable').querySelector('tbody').innerHTML =
         '<tr><td contenteditable="true"></td>' +
         '<td contenteditable="true"></td>' +
@@ -666,6 +602,10 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
       document.getElementById('wellName').innerHTML = "____ 井____段压裂施工";
       updateAllRows();
     }
+    if (totalLiquidTimer) {
+  clearInterval(totalLiquidTimer);
+  totalLiquidTimer = null;
+}
   });
 
   document.getElementById('addRowBtn').addEventListener('click', function() {
@@ -742,6 +682,109 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
   function cancelLongPress(e) {
     clearTimeout(longPressTimer);
   }
+  // 系统时间更新
+function updateSystemTime() {
+  const now = new Date();
+  document.getElementById('systemTime').value = 
+    now.toLocaleDateString() + ' ' + 
+    now.toLocaleTimeString('chinese', { hour12: false });
+}
+
+
+// 排量输入处理
+document.getElementById('displacement').addEventListener('change', function() {
+  this.value = Math.max(0, parseFloat(this.value) || 0).toFixed(1);
+});
+
+// 总液量输入处理
+document.getElementById('totalLiquid').addEventListener('change', function() {
+  this.value = Math.max(0, parseInt(this.value) || 0);
+});
+
+// 开始按钮事件
+document.getElementById('startBtn').addEventListener('click', function() {
+  // 如果已有定时器，先清掉，防止重复启动
+  if (totalLiquidTimer) {
+    clearInterval(totalLiquidTimer);
+  }
+  // 立即执行一次，然后每秒执行
+  updateDynamicTotalLiquid();
+  totalLiquidTimer = setInterval(updateDynamicTotalLiquid, 1000);
+});
+
+// ======= 新增：水平井功能 =======
+ window.closeHorizontalDialog = function() {
+    document.getElementById('horizontalWellDialog').style.display = 'none';
+  };
+
+  // 新增：绑定“关闭”按钮
+  document.getElementById('closeHorizontalBtn').addEventListener('click', closeHorizontalDialog);
+
+// 打开水平井对话框
+document.getElementById('horizontalWellBtn').addEventListener('click', () => {
+  document.getElementById('horizontalWellDialog').style.display = 'block';
+});
+
+// 关闭对话框函数
+function closeHorizontalDialog() {
+  document.getElementById('horizontalWellDialog').style.display = 'none';
+}
+window.closeHorizontalDialog = function() {
+  document.getElementById('horizontalWellDialog').style.display = 'none';
+};
+// 点击“完成”后，计算比例并定位“A靶”
+document.getElementById('completeHorizontalBtn').addEventListener('click', () => {
+  const segDepth = parseFloat(document.getElementById('segmentDepthHW').value) || 0;
+  const tgtDepth = parseFloat(document.getElementById('targetDepthHW').value) || 0;
+  if (segDepth <= 0 || tgtDepth < 0) {
+    alert('请填写有效的段深（>0）和 A 靶深（≥0）');
+    return;
+  }
+
+// ====== “完成”按钮逻辑（替换原有插入段落） ======
+document.getElementById('completeHorizontalBtn').addEventListener('click', () => {
+  const segDepth = parseFloat(document.getElementById('segmentDepthHW').value) || 0;
+  const tgtDepth = parseFloat(document.getElementById('targetDepthHW').value) || 0;
+  if (segDepth <= 0 || tgtDepth < 0) {
+    alert('请填写有效的段深（>0）和 A 靶深（≥0）');
+    return;
+  }
+  const ratio = tgtDepth / segDepth;
+
+  // 获取动画容器 & 左侧面板
+  const container = document.getElementById('wellboreAnimation');
+  const panel = container.closest('.left-panel');
+
+  // 动画容器在面板中的相对位置
+  const contRect = container.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  const offsetTop = contRect.top - panelRect.top;    // 容器顶端到面板顶端的距离
+
+  // 计算标记位置：从动画顶端开始，向下 ratio * 高度
+  const y = offsetTop + ratio * container.clientHeight;
+
+  // 移除旧标记
+  panel.querySelectorAll('.horizontal-marker').forEach(el => el.remove());
+
+  // 创建新标记并插入到 panel
+  const marker = document.createElement('div');
+  marker.className = 'horizontal-marker';
+  marker.style.top = `${y}px`;                       // 相对于 panel
+  marker.style.left = `${contRect.left - panelRect.left - 30}px`; // 紧贴容器左侧，留 20px 间距
+  marker.innerText = 'A靶';
+  panel.appendChild(marker);
+
+  closeHorizontalDialog();
+});
+});
+
+// ====== “重置”按钮逻辑中，也要清除标记 ======
+document.getElementById('resetBtn').addEventListener('click', () => {
+  setTimeout(() => {
+    document.querySelectorAll('.horizontal-marker').forEach(el => el.remove());
+  }, 0);
+});
+  
 
   // 初始化数据、事件绑定及计算更新
   loadData();
@@ -749,6 +792,6 @@ document.getElementById('groundVolume').addEventListener('change', updateTotalVo
   updateTotalVolume();
     // 新增：启动按住录入功能
   new EnhancedVoiceSystem();
-
+  setInterval(updateSystemTime, 1000);
 };
 
