@@ -1,4 +1,4 @@
-/* ---------------- 基本页面样式 ---------------- */
+、/* ---------------- 基本页面样式 ---------------- */
 body {
   font-family: Arial, sans-serif;
   background-color: #f4f4f4;
@@ -174,7 +174,7 @@ body {
 }
 /* 新增：冻结表头功能 */
 .table-container {
-  max-height: calc(100vh - 200px); /* 动态计算容器高度 */
+  max-height: calc(100vh - 280px); /* 动态计算容器高度 */
   overflow-y: auto;               /* 启用垂直滚动 */
   position: relative;             /* 创建定位上下文 */
   margin-top: 10px;               /* 与上方元素保持间距 */
@@ -193,7 +193,83 @@ table th {
   background: #f2f2f2 !important; /* 覆盖可能存在的其他背景色 */
   box-shadow: 0 2px 3px -1px rgba(0, 0, 0, 0.1); /* 添加下阴影增强立体感 */
 }
+.controls-container {
+  display: flex;
+  gap: 20px;
+  margin: 15px 0;
+  flex-wrap: wrap;
+}
+/* 新增：开始功能样式 */
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
+#systemTime {
+  width: 180px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+}
+
+#displacement,
+#totalLiquid {
+  width: 80px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#startBtn {
+  padding: 8px 20px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+/* 新增控制组样式 */
+.controls-container {
+  display: flex;
+  gap: 20px;
+  margin: 15px 0;
+  flex-wrap: wrap;
+}
+
+#systemTime {
+  width: 180px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  font-family: monospace;
+}
+#startBtn {
+  background-color: #4CAF50;
+  padding: 8px 20px;
+  transition: background-color 0.3s;
+}
+
+#startBtn:hover {
+  background-color: #45a049;
+}
+#displacement {
+  width: 80px;
+  text-align: right;
+  padding-right: 5px;
+}
+#displacement {
+  width: 80px;
+  text-align: right;
+  padding-right: 5px;
+}
+/* 数字输入框右侧按钮样式 */
+input[type=number]::-webkit-inner-spin-button {
+  opacity: 1;
+  margin-left: 4px;
+}
 /* 新增：按住录入功能样式 */
 .voice-input-container {
   display: flex;
@@ -384,4 +460,17 @@ tr.selected {
 }
 tr:active {
   background-color: #bbdefb !important;
+}
+/* ---------------- 新增：水平井按钮样式 ---------------- */
+
+
+
+/* ---------------- 新增：A靶标记样式 ---------------- */
+
+.horizontal-marker {
+  position: absolute;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #0000FF;
+  white-space: nowrap;
 }
