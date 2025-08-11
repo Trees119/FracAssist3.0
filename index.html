@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
+<script type="module" src="offlineVoice.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>压裂指挥辅助工具</title>
@@ -12,6 +13,7 @@
     <div class="container">
       <!-- 左侧容器：显示动画和图例 -->
       <div class="left-panel">
+			<button id="horizontalWellBtn" class="control-btn">水平井</button>
         <h2 class="left-panel-title">井筒流体</h2>
         <div class="legend-container">
           <div class="legend-item">
@@ -86,6 +88,20 @@
          <span id="confidence"></span>
          <div id="resultDisplay"></div>
         </div>
+        <div class="controls-container">
+          <div class="control-group">
+            <button id="startBtn">开始</button>
+            <input type="text" id="systemTime" placeholder="系统时间" readonly>
+          </div>
+          <div class="control-group">
+            <label>排量：</label>
+            <input type="number" id="displacement" step="0.5" value="0.0" min="0">
+          </div>
+          <div class="control-group">
+            <label>总液量：</label>
+            <input type="number" id="totalLiquid" step="1" value="0" min="0">
+          </div>
+        </div>
         <div class="buttons">
           <button id="addRowBtn">添加</button>
           <button id="deleteRowBtn">删除</button>
@@ -115,6 +131,21 @@
         </div>
       </div>
     </div>
+
+      <div id="horizontalWellDialog" class="modal">
+    <div class="modal-content">
+      <h3>水平井 参数输入</h3>
+      <label for="segmentDepthHW">段深：</label>
+      <input type="number" id="segmentDepthHW" placeholder="请输入段深">
+      <label for="targetDepthHW">A靶深：</label>
+      <input type="number" id="targetDepthHW" placeholder="请输入 A 靶深">
+      <div class="modal-buttons">
+        <button id="completeHorizontalBtn">完成</button>
+        <button type="button" id="closeHorizontalBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+    
     <!-- 引入外部脚本 -->
     <script src="script.js"></script>
   </body>
